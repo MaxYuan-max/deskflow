@@ -41,6 +41,7 @@ void KeyMap::swap(KeyMap &x) noexcept
   m_modifierKeys.swap(x.m_modifierKeys);
   m_halfDuplex.swap(x.m_halfDuplex);
   m_halfDuplexMods.swap(x.m_halfDuplexMods);
+  m_keyboardLayouts.swap(x.m_keyboardLayouts);
   auto tmp1 = m_numGroups;
   m_numGroups = x.m_numGroups;
   x.m_numGroups = tmp1;
@@ -298,18 +299,33 @@ void KeyMap::setLanguageData(std::vector<std::string> layouts)
   m_keyboardLayouts = std::move(layouts);
 }
 
+const std::vector<std::string> &KeyMap::getLanguageData() const
+{
+  return m_keyboardLayouts;
+}
+
 int32_t KeyMap::getLanguageGroupID(int32_t group, const std::string &lang) const
 {
-  auto id = group;
-
-  if (auto it = std::find(m_keyboardLayouts.begin(), m_keyboardLayouts.end(), lang); it != m_keyboardLayouts.end()) {
-    id = static_cast<int>(std::distance(m_keyboardLayouts.begin(), it));
-    LOG_VERBOSE("language %s has group id %d", lang.c_str(), id);
-  } else {
-    LOG_VERBOSE("could not found requested language");
+  if (lang.empty()) {
+    return group;
   }
 
-  return id;
+  // Multiple selectable input sources can share a language. Keep the
+  // current source when it already matches rather than selecting the first.
+  if (group >= 0 && static_cast<size_t>(group) < m_keyboardLayouts.size() && m_keyboardLayouts[group] == lang) {
+    return group;
+  }
+
+  const auto numLanguages = std::min(m_keyboardLayouts.size(), static_cast<size_t>(getNumGroups()));
+  const auto end = m_keyboardLayouts.begin() + numLanguages;
+  if (const auto it = std::find(m_keyboardLayouts.begin(), end, lang); it != end) {
+    const auto id = static_cast<int32_t>(std::distance(m_keyboardLayouts.begin(), it));
+    LOG_VERBOSE("language %s has group id %d", lang.c_str(), id);
+    return id;
+  }
+
+  LOG_VERBOSE("no group for requested language %s; keeping group %d", lang.c_str(), group);
+  return group;
 }
 
 int32_t KeyMap::getNumGroups() const
@@ -489,8 +505,9 @@ const KeyMap::KeyItem *KeyMap::mapCommandKey(
   // find the first key that generates this KeyID
   const KeyItem *keyItem = nullptr;
   const auto numGroups = getNumGroups();
+  const auto requestedGroup = getLanguageGroupID(group, lang);
   for (int32_t groupOffset = 0; groupOffset < numGroups; ++groupOffset) {
-    const auto effectiveGroup = getEffectiveGroup(group, groupOffset);
+    const auto effectiveGroup = getEffectiveGroup(requestedGroup, groupOffset);
     const KeyEntryList &entryList = keyGroupTable[effectiveGroup];
     for (const auto &entry : entryList) {
       if (entry.size() != 1) {
@@ -531,7 +548,7 @@ const KeyMap::KeyItem *KeyMap::mapCommandKey(
 
   // add the key
   if (!keysForKeyItem(
-          *keyItem, newGroup, newModifiers, newState, desiredMask, s_overrideModifiers, isAutoRepeat, keys, lang
+          *keyItem, newGroup, newModifiers, newState, desiredMask, s_overrideModifiers, isAutoRepeat, keys
       )) {
     LOG_VERBOSE("can't map key");
     keys.clear();
@@ -602,7 +619,7 @@ const KeyMap::KeyItem *KeyMap::mapCharacterKey(
 
   // add each key
   for (auto &item : *itemList) {
-    if (!keysForKeyItem(item, newGroup, newModifiers, newState, desiredMask, 0, isAutoRepeat, keys, lang)) {
+    if (!keysForKeyItem(item, newGroup, newModifiers, newState, desiredMask, 0, isAutoRepeat, keys)) {
       LOG_VERBOSE("can't map key");
       keys.clear();
       return nullptr;
@@ -621,12 +638,6 @@ const KeyMap::KeyItem *KeyMap::mapCharacterKey(
   currentState = newState;
 
   return &keyItem;
-}
-
-void KeyMap::addGroupToKeystroke(Keystrokes &keys, int32_t &group, const std::string &lang) const
-{
-  group = getLanguageGroupID(group, lang);
-  keys.push_back(Keystroke(group, true, false));
 }
 
 const KeyMap::KeyItem *KeyMap::mapModifierKey(
@@ -689,8 +700,7 @@ const KeyMap::KeyItem *KeyMap::keyForModifier(KeyButton button, int32_t group, i
 
 bool KeyMap::keysForKeyItem(
     const KeyItem &keyItem, int32_t &group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-    KeyModifierMask desiredState, KeyModifierMask overrideModifiers, bool isAutoRepeat, Keystrokes &keystrokes,
-    const std::string &lang
+    KeyModifierMask desiredState, KeyModifierMask overrideModifiers, bool isAutoRepeat, Keystrokes &keystrokes
 ) const
 {
   static const KeyModifierMask s_notRequiredMask = KeyModifierAltGr | KeyModifierNumLock | KeyModifierScrollLock;
@@ -698,7 +708,7 @@ bool KeyMap::keysForKeyItem(
   // add keystrokes to adjust the group
   if (group != keyItem.m_group) {
     group = keyItem.m_group;
-    addGroupToKeystroke(keystrokes, group, lang);
+    keystrokes.push_back(Keystroke(group, true, false));
   }
 
   EKeystroke type;

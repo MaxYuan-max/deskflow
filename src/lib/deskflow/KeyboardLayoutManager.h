@@ -7,6 +7,7 @@
 #pragma once
 
 #include "deskflow/AppUtil.h"
+#include <string_view>
 #include <vector>
 
 namespace deskflow {
@@ -20,6 +21,8 @@ public:
   explicit KeyboardLayoutManager(
       const std::vector<std::string> &localLayouts = AppUtil::instance().getKeyboardLayoutList()
   );
+
+  static std::string languageCode(std::string_view identifier);
 
   /**
    * @brief setRemoteLayouts sets remote layouts

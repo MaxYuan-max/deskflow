@@ -14,6 +14,28 @@ void KeyboardLayoutManagerTests::initTestCase()
   m_log.setFilter(LogLevel::Level::Verbose);
 }
 
+void KeyboardLayoutManagerTests::languageCode_data()
+{
+  QTest::addColumn<QString>("identifier");
+  QTest::addColumn<QString>("expected");
+
+  QTest::newRow("sogou-simplified-chinese") << QStringLiteral("zh-Hans") << QStringLiteral("zh");
+  QTest::newRow("traditional-chinese") << QStringLiteral("zh-Hant-TW") << QStringLiteral("zh");
+  QTest::newRow("english-region") << QStringLiteral("en_US") << QStringLiteral("en");
+  QTest::newRow("canonical-case") << QStringLiteral("EN-us") << QStringLiteral("en");
+  QTest::newRow("plain-language") << QStringLiteral("ja") << QStringLiteral("ja");
+  QTest::newRow("unsupported-protocol-language") << QStringLiteral("cmn-Hans") << QString();
+  QTest::newRow("missing-language") << QString() << QString();
+}
+
+void KeyboardLayoutManagerTests::languageCode()
+{
+  QFETCH(QString, identifier);
+  QFETCH(QString, expected);
+
+  QCOMPARE(deskflow::KeyboardLayoutManager::languageCode(identifier.toStdString()), expected.toStdString());
+}
+
 void KeyboardLayoutManagerTests::remoteLayouts()
 {
   std::string remoteLayouts = "ruenuk";

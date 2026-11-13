@@ -33,6 +33,28 @@ KeyboardLayoutManager::KeyboardLayoutManager(const std::vector<std::string> &loc
   LOG_INFO("local layouts: %s", vectorToString(m_localLayouts, ", ").c_str());
 }
 
+std::string KeyboardLayoutManager::languageCode(std::string_view identifier)
+{
+  const auto separator = identifier.find_first_of("-_");
+  const auto language = identifier.substr(0, separator);
+  if (language.size() != 2) {
+    return {};
+  }
+
+  char code[2];
+  for (size_t i = 0; i < 2; ++i) {
+    auto letter = language[i];
+    if (letter >= 'A' && letter <= 'Z') {
+      letter += 'a' - 'A';
+    }
+    if (letter < 'a' || letter > 'z') {
+      return {};
+    }
+    code[i] = letter;
+  }
+  return std::string(code, 2);
+}
+
 void KeyboardLayoutManager::setRemoteLayouts(const std::string_view &remoteLayouts)
 {
   if (!remoteLayouts.empty() && remoteLayouts.size() % 2 != 0) {

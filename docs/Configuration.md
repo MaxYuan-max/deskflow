@@ -52,12 +52,30 @@ It will begin with `[client]`
 | Option                    |    Valid Values    | Description |
 |:--------------------------|:------------------:|:-----------|
 | dynamicConnectionInterval | `true` or `false`  | Use dynamic connection retry times based on number of previously failed attempts [default: false] |
-| languageSync              | `true` or `false`  | Sync to server language [default: true] |
+| languageSync              | `true` or `false`  | Select a local input source matching the server language before typing [default: true] |
 | remoteHost                | `IP` or `hostname` | The remote host(s) to connect to. Use a comma separated list when you want to try several hosts |
 | yScrollScale              | Double 0.1 - 10.0  | Vertical mouse scrolling will be scaled by this amount on the client [default: 1.0] |
 | xScrollScale              | Double 0.1 - 10.0  | Horizontal mouse scrolling will be scaled by this amount on the client [default: 1.0] |
 | invertYScroll             | `true` or `false`  | Invert vertical scroll on this client [default: false] |
 | invertXScroll             | `true` or `false`  | Invert horizontal scroll on this client [default: false] |
+
+#### macOS input-source synchronization
+
+Enable the input languages you want to use on both computers. Deskflow matches the
+language of the selected input source, not the underlying keyboard layout of an
+input method. Language tags such as `zh-Hans` and `en-US` are matched as `zh` and
+`en`. An input method without its own keyboard-layout data uses an ASCII-capable
+layout for physical key mapping.
+
+If the current local input source already matches the server language, Deskflow
+keeps it. Otherwise it selects an enabled, selectable source for that language
+before delivering the incoming key. Synchronization is applied with keyboard
+events; it is not background mirroring of every connected computer's input source.
+
+This does not synchronize Sogou's internal Chinese/English toggle. For predictable
+language switching, switch between the Sogou input source and an Apple English
+input source such as ABC or U.S., rather than toggling English inside Sogou.
+
 
 ### Core
 

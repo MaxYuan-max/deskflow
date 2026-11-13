@@ -21,6 +21,11 @@ private Q_SLOTS:
   void findBestKey_noRequiredDown_cannotMatch();
   void isCommand();
   void mapkey();
+  void mapKey_languageSync_data();
+  void mapKey_languageSync();
+  void mapKey_languageSync_bidirectional();
+  void mapKey_languageSync_missingTargetKey_usesMappedGroup();
+  void mapKey_languageSync_refreshKeepsAlignedGroups();
   void parseModifiers_plusKey_keepsPlusAsKey();
   void parseKey_plusSymbol_parsesAsAsciiKey();
 

@@ -732,6 +732,7 @@ void KeyState::updateKeyMap(deskflow::KeyMap *existing)
   } else {
     // get the current keyboard map
     deskflow::KeyMap keyMap;
+    keyMap.setLanguageData(m_keyMap.getLanguageData());
     getKeyMap(keyMap);
     m_keyMap.swap(keyMap);
     m_keyMap.finish();

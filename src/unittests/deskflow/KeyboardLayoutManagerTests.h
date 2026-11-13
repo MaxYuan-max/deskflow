@@ -13,6 +13,8 @@ class KeyboardLayoutManagerTests : public QObject
   Q_OBJECT
 private Q_SLOTS:
   void initTestCase();
+  void languageCode_data();
+  void languageCode();
   // Test are run in order top to bottom
   void remoteLayouts();
   void remoteLayouts_tooShort_returnsEmpty();

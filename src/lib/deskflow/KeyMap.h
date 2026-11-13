@@ -217,7 +217,9 @@ public:
       KeyModifierMask desiredMask, bool isAutoRepeat, const std::string &lang
   ) const;
 
+  //! Set one language entry per source group, retaining duplicates and empty entries.
   void setLanguageData(std::vector<std::string> layouts);
+  const std::vector<std::string> &getLanguageData() const;
 
   //! Get number of groups
   /*!
@@ -381,8 +383,7 @@ private:
   // resulting modifier state.
   bool keysForKeyItem(
       const KeyItem &keyItem, int32_t &group, ModifierToKeys &activeModifiers, KeyModifierMask &currentState,
-      KeyModifierMask desiredState, KeyModifierMask overrideModifiers, bool isAutoRepeat, Keystrokes &keystrokes,
-      const std::string &lang
+      KeyModifierMask desiredState, KeyModifierMask overrideModifiers, bool isAutoRepeat, Keystrokes &keystrokes
   ) const;
 
   // fills \p keystrokes with the keys to synthesize the modifiers
@@ -420,8 +421,6 @@ private:
 
   // Ways to synthesize a KeyID over multiple keyboard groups
   using KeyGroupTable = std::vector<KeyEntryList>;
-
-  void addGroupToKeystroke(Keystrokes &keys, int32_t &group, const std::string &lang) const;
 
   int32_t getLanguageGroupID(int32_t group, const std::string &lang) const;
   const KeyItemList *

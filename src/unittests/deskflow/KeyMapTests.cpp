@@ -183,6 +183,173 @@ void KeyMapTests::mapkey()
   QVERIFY(result == nullptr);
 }
 
+void KeyMapTests::mapKey_languageSync_data()
+{
+  QTest::addColumn<int>("currentGroup");
+  QTest::addColumn<QString>("language");
+  QTest::addColumn<int>("expectedGroup");
+  QTest::addColumn<bool>("repeat");
+
+  QTest::newRow("english-to-chinese") << 1 << QString("zh") << 2 << false;
+  QTest::newRow("chinese-to-english") << 2 << QString("en") << 1 << false;
+  QTest::newRow("repeat-english-to-chinese") << 1 << QString("zh") << 2 << true;
+  QTest::newRow("matching-duplicate-language") << 3 << QString("en") << 3 << false;
+  QTest::newRow("missing-language") << 2 << QString("de") << 2 << false;
+  QTest::newRow("unsupported-language") << 2 << QString() << 2 << false;
+  QTest::newRow("unsupported-current-source") << 0 << QString("zh") << 2 << false;
+}
+
+void KeyMapTests::mapKey_languageSync()
+{
+  QFETCH(int, currentGroup);
+  QFETCH(QString, language);
+  QFETCH(int, expectedGroup);
+  QFETCH(bool, repeat);
+
+  KeyMap keyMap;
+  // The first source has an unsupported language; it must retain its index.
+  // All sources share the same physical ASCII mapping, including the IME.
+  keyMap.setLanguageData({"", "en", "zh", "en"});
+  for (int32_t group = 0; group < 4; ++group) {
+    KeyMap::KeyItem item;
+    item.m_id = 'a';
+    item.m_button = 1;
+    item.m_group = group;
+    keyMap.addKeyEntry(item);
+  }
+  keyMap.finish();
+
+  KeyMap::Keystrokes strokes;
+  KeyMap::ModifierToKeys modifiers;
+  KeyModifierMask state = 0;
+  const auto item = keyMap.mapKey(strokes, 'a', currentGroup, modifiers, state, 0, repeat, language.toStdString());
+  QVERIFY(item != nullptr);
+  QCOMPARE(item->m_id, static_cast<KeyID>('a'));
+  QCOMPARE(item->m_group, expectedGroup);
+  QCOMPARE(item->m_button, static_cast<KeyButton>(1));
+
+  const bool changesGroup = currentGroup != expectedGroup;
+  QCOMPARE(strokes.size(), static_cast<size_t>(changesGroup ? 2 : 1));
+  if (changesGroup) {
+    const auto &selection = strokes.front();
+    QCOMPARE(selection.m_type, KeyMap::Keystroke::KeyType::Group);
+    QCOMPARE(selection.m_data.m_group.m_group, expectedGroup);
+    QVERIFY(selection.m_data.m_group.m_absolute);
+    QVERIFY(!selection.m_data.m_group.m_restore);
+  }
+
+  const auto &key = strokes.back();
+  QCOMPARE(key.m_type, KeyMap::Keystroke::KeyType::Button);
+  QCOMPARE(key.m_data.m_button.m_button, static_cast<KeyButton>(1));
+  QVERIFY(key.m_data.m_button.m_press);
+  QCOMPARE(key.m_data.m_button.m_repeat, repeat);
+  QCOMPARE(state, static_cast<KeyModifierMask>(0));
+  QVERIFY(modifiers.empty());
+}
+
+void KeyMapTests::mapKey_languageSync_bidirectional()
+{
+  KeyMap keyMap;
+  keyMap.setLanguageData({"en", "zh"});
+  for (int32_t group = 0; group < 2; ++group) {
+    KeyMap::KeyItem item;
+    item.m_id = 'a';
+    item.m_button = 1;
+    item.m_group = group;
+    keyMap.addKeyEntry(item);
+  }
+  keyMap.finish();
+
+  int32_t currentGroup = 0;
+  KeyMap::ModifierToKeys modifiers;
+  KeyModifierMask state = 0;
+  for (const auto &language : {"zh", "en"}) {
+    KeyMap::Keystrokes strokes;
+    const auto item = keyMap.mapKey(strokes, 'a', currentGroup, modifiers, state, 0, false, language);
+    QVERIFY(item != nullptr);
+    QCOMPARE(strokes.size(), static_cast<size_t>(2));
+    const int32_t expectedGroup = 1 - currentGroup;
+    QCOMPARE(strokes.front().m_type, KeyMap::Keystroke::KeyType::Group);
+    QCOMPARE(strokes.front().m_data.m_group.m_group, expectedGroup);
+    QCOMPARE(item->m_group, expectedGroup);
+    QCOMPARE(strokes.back().m_type, KeyMap::Keystroke::KeyType::Button);
+    QCOMPARE(strokes.back().m_data.m_button.m_button, static_cast<KeyButton>(1));
+    QVERIFY(strokes.back().m_data.m_button.m_press);
+    currentGroup = expectedGroup;
+  }
+  QCOMPARE(currentGroup, 0);
+}
+
+void KeyMapTests::mapKey_languageSync_missingTargetKey_usesMappedGroup()
+{
+  KeyMap keyMap;
+  keyMap.setLanguageData({"en", "zh", "de"});
+  KeyMap::KeyItem item;
+  item.m_id = 'a';
+  item.m_button = 1;
+  item.m_group = 0;
+  keyMap.addKeyEntry(item);
+  item.m_id = 'b';
+  item.m_button = 2;
+  item.m_group = 2;
+  keyMap.addKeyEntry(item);
+  keyMap.finish();
+
+  KeyMap::Keystrokes strokes;
+  KeyMap::ModifierToKeys modifiers;
+  KeyModifierMask state = 0;
+  const auto mapped = keyMap.mapKey(strokes, 'a', 2, modifiers, state, 0, false, "zh");
+  QVERIFY(mapped != nullptr);
+  QCOMPARE(mapped->m_group, 0);
+  QCOMPARE(strokes.size(), static_cast<size_t>(2));
+  QCOMPARE(strokes.front().m_type, KeyMap::Keystroke::KeyType::Group);
+  QCOMPARE(strokes.front().m_data.m_group.m_group, 0);
+  QCOMPARE(strokes.back().m_type, KeyMap::Keystroke::KeyType::Button);
+  QCOMPARE(strokes.back().m_data.m_button.m_button, static_cast<KeyButton>(1));
+  QVERIFY(strokes.back().m_data.m_button.m_press);
+}
+
+void KeyMapTests::mapKey_languageSync_refreshKeepsAlignedGroups()
+{
+  KeyMap keyMap;
+  keyMap.setLanguageData({"en", "zh"});
+  KeyMap::KeyItem item;
+  item.m_id = 'a';
+  item.m_button = 1;
+  for (int32_t group = 0; group < 2; ++group) {
+    item.m_group = group;
+    keyMap.addKeyEntry(item);
+  }
+  keyMap.finish();
+
+  KeyMap refreshed;
+  refreshed.setLanguageData({"", "zh", "en", "en"});
+  for (int32_t group = 0; group < 4; ++group) {
+    item.m_group = group;
+    refreshed.addKeyEntry(item);
+  }
+  refreshed.finish();
+  keyMap.swap(refreshed);
+
+  for (const int32_t currentGroup : {0, 3}) {
+    KeyMap::Keystrokes strokes;
+    KeyMap::ModifierToKeys modifiers;
+    KeyModifierMask state = 0;
+    const auto mapped = keyMap.mapKey(strokes, 'a', currentGroup, modifiers, state, 0, false, "en");
+    QVERIFY(mapped != nullptr);
+    const int32_t expectedGroup = currentGroup == 0 ? 2 : 3;
+    QCOMPARE(mapped->m_group, expectedGroup);
+    QCOMPARE(strokes.size(), static_cast<size_t>(currentGroup == 0 ? 2 : 1));
+    if (currentGroup == 0) {
+      QCOMPARE(strokes.front().m_type, KeyMap::Keystroke::KeyType::Group);
+      QCOMPARE(strokes.front().m_data.m_group.m_group, expectedGroup);
+    }
+    QCOMPARE(strokes.back().m_type, KeyMap::Keystroke::KeyType::Button);
+    QCOMPARE(strokes.back().m_data.m_button.m_button, static_cast<KeyButton>(1));
+    QVERIFY(strokes.back().m_data.m_button.m_press);
+  }
+}
+
 void KeyMapTests::parseModifiers_plusKey_keepsPlusAsKey()
 {
   std::string keystroke = "Control+Shift++";
