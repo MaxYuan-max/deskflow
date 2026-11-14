@@ -959,19 +959,27 @@ void OSXKeyState::setGroup(int32_t group)
     return;
   }
 
-  {
+  // TIS/TSM is not thread-safe and AppKit queries input sources on the main
+  // thread, so the switch has to happen there to stay serialised with it.
+  // Capture by value: the request may outlive this call if the main thread is
+  // slow to pick it up.
+  const bool selected = deskflow::osx::runOnMainThread([group, inputSource] {
     std::lock_guard<std::mutex> lock(g_tisMutex);
     const auto selectable = (CFBooleanRef)TISGetInputSourceProperty(inputSource, kTISPropertyInputSourceIsSelectCapable);
     if (!selectable || !CFBooleanGetValue(selectable)) {
       LOG_WARN("keyboard input source for group %d does not allow programmatic selection", group);
-      return;
+      return false;
     }
 
     const OSStatus status = TISSelectInputSource(inputSource);
     if (status != noErr) {
       LOG_WARN("failed to select keyboard input source group %d: OSStatus %d", group, static_cast<int>(status));
-      return;
+      return false;
     }
+    return true;
+  });
+  if (!selected) {
+    return;
   }
 
   LOG_VERBOSE("keyboard input source changed to group %d", group);
