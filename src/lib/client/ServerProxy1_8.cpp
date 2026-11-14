@@ -45,8 +45,9 @@ ServerProxy::ConnectionResult ServerProxy1_8::parseMessage(const uint8_t *code)
     lang = deskflow::KeyboardLayoutManager::languageCode(lang);
     LOG_VERBOSE("recv key down id=0x%08x, mask=0x%04x, button=0x%04x, lang=\"%s\"", id, mask, button, lang.c_str());
 
+    const auto syncLang = layoutSyncFor(lang);
     setActiveServerLayout(lang);
-    keyDown(id, mask, button, lang);
+    keyDown(id, mask, button, syncLang);
   } else if (memcmp(code, kMsgDKeyRepeat, 4) == 0) {
     uint16_t id = 0;
     uint16_t mask = 0;
@@ -60,7 +61,7 @@ ServerProxy::ConnectionResult ServerProxy1_8::parseMessage(const uint8_t *code)
         lang.c_str()
     );
 
-    keyRepeat(id, mask, count, button, lang);
+    keyRepeat(id, mask, count, button, layoutSyncFor(lang));
   } else if (memcmp(code, kMsgCEnter, 4) == 0) {
     m_serverLayout.clear();
     m_isUserNotifiedAboutLayoutSyncError = false;
@@ -103,4 +104,14 @@ void ServerProxy1_8::setActiveServerLayout(const std::string_view &layout)
   } else {
     m_isUserNotifiedAboutLayoutSyncError = false;
   }
+}
+
+std::string ServerProxy1_8::layoutSyncFor(const std::string &lang) const
+{
+  if (lang.empty() || lang == m_serverLayout) {
+    return {};
+  }
+
+  LOG_VERBOSE("server layout changed to %s", lang.c_str());
+  return lang;
 }

@@ -27,6 +27,15 @@ private:
   void setServerLayouts();
   void setActiveServerLayout(const std::string_view &layout);
 
+  //! Layout to forward with a key event.
+  /*!
+  Returns the server layout only when it changed since it was last seen. The
+  client re-applies the layout on every keystroke it is given, so passing it
+  unconditionally would immediately undo an input source change made locally
+  (for example with \c Control-Space on macOS).
+  */
+  std::string layoutSyncFor(const std::string &lang) const;
+
   std::string m_serverLayout;
   bool m_isUserNotifiedAboutLayoutSyncError = false;
   deskflow::KeyboardLayoutManager m_layoutManager;
